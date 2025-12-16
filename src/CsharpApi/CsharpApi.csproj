@@ -11,5 +11,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\compare-pdf-text-extraction.ServiceDefaults\compare-pdf-text-extraction.ServiceDefaults.csproj" />
+  </ItemGroup>
   
 </Project>
