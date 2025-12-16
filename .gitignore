@@ -1,0 +1,16 @@
+# dotnet
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+.azure
+node_modules/
+
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
