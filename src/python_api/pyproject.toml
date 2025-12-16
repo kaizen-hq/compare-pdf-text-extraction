@@ -1,0 +1,20 @@
+[project]
+name = "python-api"
+version = "0.1.0"
+description = "PDF Reader API using PyMuPDF and FastAPI"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.32.0",
+    "pymupdf==1.26.6",
+    "python-multipart==0.0.12",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+only-include = ["python_api.py"]
+
