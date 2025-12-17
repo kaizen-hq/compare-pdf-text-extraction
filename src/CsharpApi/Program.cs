@@ -4,6 +4,9 @@ using CsharpApi.Services;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
+// Add service defaults & Aspire client integrations.
+builder.AddServiceDefaults();
+
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
@@ -76,6 +79,7 @@ todosApi.MapGet("/{id}", Results<Ok<Todo>, NotFound> (int id) =>
         : TypedResults.NotFound())
     .WithName("GetTodoById");
 
+app.MapDefaultEndpoints();
 app.Run();
 
 public record Todo(int Id, string? Title, DateOnly? DueBy = null, bool IsComplete = false);
