@@ -12,10 +12,6 @@ var pythonApi = builder
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health");
 
-if (!builder.ExecutionContext.IsPublishMode)
-    builder.CreateResourceBuilder((ExecutableResource)builder.Resources.First(x => x.Name == $"{pythonApi.Resource.Name}-installer"))
-        .WithCertificateTrustScope(CertificateTrustScope.None);
-
 var csharpApi = builder.AddProject<Projects.CsharpApi>("csharp-api");
 
 builder.AddProject<Projects.Web>("web")
