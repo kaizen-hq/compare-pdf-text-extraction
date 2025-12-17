@@ -1,20 +1,64 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
-<div class="page">
-    @*<div class="sidebar">
-        <NavMenu />
-    </div>*@
+<header class="header">
+    <div class="container">
+        <a href="/">
+            <img src="images/solid.png" alt="Kaizen Logo" class="logo">
+        </a>
+    </div>
+</header>
 
-    <main>
-        @*<div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>*@
+<main role="main" class="people-main">
+    <section class="people-hero">
+        <div class="container">
+            <h1>PDF Text Extraction</h1>
+            <p class="subhead">
+                Compare extraction methods
+            </p>
+        </div>
+    </section>
+    <section class="people-sections">
+        <div class="people-section kaizen-blurb">
+            <h2>kaizen</h2>
+            <p><strong>kai:</strong> change | <strong>zen:</strong> for the better</p>
+            <blockquote cite="https://www.azquotes.com/quote/905327">
+                <p>The Toyota style is not to create results by working hard.
+                    It is a system that says there is no limit to people's creativity.
+                    People don't go to Toyota to <em>work</em> they go there to <em>think</em>.</p>
+                <figcaption>— Taiichi Ohno</figcaption>
+            </blockquote>
+        </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <div class="people-section">
+            <article class="content px-4">
+                @Body
+            </article>
+        </div>
+    </section>
+</main>
+
+<footer class="footer">
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-left">
+                <div class="footer-logo">KAIZEN.IO</div>
+                <p class="footer-tagline">Building the future, one iteration at a time in Dallas, TX.</p>
+            </div>
+            <div class="footer-right">
+                <div class="footer-links">
+                    <a href="https://www.kaizen.io/portfolio">Work</a>
+                    <a href="https://www.kaizen.io/people">Team</a>
+                    <a href="mailto:info@kaizen.io?subject=Service%20Inquiry&body=I would%20like%20to%20discuss%20which%20service%20is%20right%20for%20my%20needs.">Contact</a>
+                    <a href="https://calendly.com/kijanawoodard/10x-operational-transformation-method-market-research-call" class="footer-cta-link">Get Started</a>
+                    <a href="https://www.kaizen.io/privacy-policy">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-copyright">
+            &copy; 2025 KAIZEN.IO // ALL SYSTEMS NOMINAL // VERSION 2.0
+        </div>
+    </div>
+</footer>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
