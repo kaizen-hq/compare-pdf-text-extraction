@@ -1,3 +1,6 @@
 {
-  "appHostPath": "../src/compare-pdf-text-extraction.AppHost/compare-pdf-text-extraction.AppHost.csproj"
+  "appHostPath": "../src/compare-pdf-text-extraction.AppHost/compare-pdf-text-extraction.AppHost.csproj",
+  "features": {
+    "defaultWatchEnabled": "true"
+  }
 }
