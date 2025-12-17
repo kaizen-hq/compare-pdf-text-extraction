@@ -1,7 +1,418 @@
 ﻿@page "/"
+@using Web.Services
+@rendermode InteractiveServer
+@inject PyMuPdfService PdfReaderService
+@inject PdfPigService PdfPigService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>PDF Reader Comparison - Memoranda</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="containerx mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">PDF Reader Comparison</h1>
+            <p class="lead mb-4">Upload a PDF to compare text extraction between PyMuPdf and Pdf Pig.</p>
+        </div>
+    </div>
 
-Welcome to your new app.
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="short card">
+                <div class="card-header">
+                    <h5 class="mb-0">Upload PDF</h5>
+                </div>
+                <div class="card-body">
+                    <InputFile OnChange="HandleFileSelected" class="form-control mb-3" accept=".pdf" />
+                    @if (!string.IsNullOrEmpty(_uploadedFileName))
+                    {
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> File selected: @_uploadedFileName
+                        </div>
+                    }
+                    <button class="btn btn-primary" @onclick="CompareExtraction" disabled="@(_isProcessing || _selectedFile == null)">
+                        @if (_isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <text>Processing...</text>
+                        }
+                        else
+                        {
+                            <text>Compare Extraction</text>
+                        }
+                    </button>
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger mt-3">
+                            <i class="bi bi-exclamation-triangle"></i> @_errorMessage
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_hasResults)
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Comparison Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>PyMuPdf:</strong><br/>
+                                <span class="badge bg-info">@_httpClientTextLength characters</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Pdf Pig:</strong><br/>
+                                <span class="badge bg-info">@_pdfPigTextLength characters</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Difference:</strong><br/>
+                                <span class="badge @(_textsMatch ? "bg-success" : "bg-warning")">
+                                    @(_textsMatch ? "Identical" : "Different")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">PyMuPdf</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-output">
+                            @if (string.IsNullOrEmpty(_httpClientText))
+                            {
+                                <em class="text-muted">No text extracted</em>
+                            }
+                            else
+                            {
+                                <pre>@_httpClientText</pre>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Pdf Pig</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-output">
+                            @if (string.IsNullOrEmpty(_pdfPigText))
+                            {
+                                <em class="text-muted">No text extracted</em>
+                            }
+                            else
+                            {
+                                <pre>@_pdfPigText</pre>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (!_textsMatch)
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Text Diff</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="diff-output">
+                                @foreach (var line in _diffLines)
+                                {
+                                    <div class="diff-line @line.Type">
+                                        <span class="diff-marker">@line.Marker</span>
+                                        <span class="diff-content">@line.Content</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .text-output {
+        max-height: 600px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+    }
+
+    .text-output pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .diff-output {
+        max-height: 600px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        font-family: 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.6;
+    }
+
+    .diff-line {
+        padding: 2px 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .diff-line.added {
+        background-color: #d4edda;
+    }
+
+    .diff-line.removed {
+        background-color: #f8d7da;
+    }
+
+    .diff-line.context {
+        background-color: transparent;
+    }
+
+    .diff-marker {
+        display: inline-block;
+        width: 30px;
+        text-align: right;
+        margin-right: 10px;
+        color: #6c757d;
+        font-weight: bold;
+    }
+
+    .diff-content {
+        display: inline-block;
+    }
+
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+
+    .short.card {
+        max-width: 45rem;
+    }
+</style>
+
+@code {
+    private IBrowserFile? _selectedFile;
+    private string _uploadedFileName = string.Empty;
+    private bool _isProcessing;
+    private string _errorMessage = string.Empty;
+    private bool _hasResults;
+    
+    private string _httpClientText = string.Empty;
+    private string _pdfPigText = string.Empty;
+    private int _httpClientTextLength;
+    private int _pdfPigTextLength;
+    private bool _textsMatch;
+    
+    private List<DiffLine> _diffLines = new();
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _uploadedFileName = e.File.Name;
+        _hasResults = false;
+        _errorMessage = string.Empty;
+        _httpClientText = string.Empty;
+        _pdfPigText = string.Empty;
+        _diffLines.Clear();
+        StateHasChanged();
+    }
+
+    private async Task CompareExtraction()
+    {
+        if (_selectedFile == null)
+        {
+            _errorMessage = "Please select a file first";
+            return;
+        }
+
+        _isProcessing = true;
+        _errorMessage = string.Empty;
+        _hasResults = false;
+        _httpClientText = string.Empty;
+        _pdfPigText = string.Empty;
+        _diffLines.Clear();
+
+        try
+        {
+            // Read the file stream
+            await using var fileStream = _selectedFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024); // 100MB max
+            
+            // Create memory streams for both services (they may consume the stream)
+            var httpClientStream = new MemoryStream();
+            var pdfPigStream = new MemoryStream();
+            
+            await fileStream.CopyToAsync(httpClientStream);
+            httpClientStream.Position = 0;
+            await httpClientStream.CopyToAsync(pdfPigStream);
+
+            Console.WriteLine($"position: {httpClientStream.Position}");
+            
+            httpClientStream.Position = 0;
+            pdfPigStream.Position = 0;
+
+            Console.WriteLine($"position: {httpClientStream.Position}");
+            // Extract text from both services in parallel
+            var httpClientTask = PdfReaderService.ExtractText(httpClientStream, _selectedFile.Name);
+            var pdfPigTask = PdfPigService.ExtractText(pdfPigStream, _selectedFile.Name);
+
+            await Task.WhenAll(httpClientTask, pdfPigTask);
+
+            _httpClientText = await httpClientTask;
+            _pdfPigText = await pdfPigTask;
+
+            _httpClientTextLength = _httpClientText.Length;
+            _pdfPigTextLength = _pdfPigText.Length;
+            
+            // Compare texts ignoring whitespace differences
+            var normalized1 = NormalizeTextForComparison(_httpClientText);
+            var normalized2 = NormalizeTextForComparison(_pdfPigText);
+            _textsMatch = normalized1 == normalized2;
+
+            // Generate diff if texts don't match (ignoring whitespace)
+            if (!_textsMatch)
+            {
+                _diffLines = GenerateDiff(_httpClientText, _pdfPigText);
+            }
+
+            _hasResults = true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Error processing PDF: {ex}";
+            Console.WriteLine($"Error: {ex}");
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private List<DiffLine> GenerateDiff(string text1, string text2)
+    {
+        var lines1 = text1.Split('\n');
+        var lines2 = text2.Split('\n');
+        
+        // Normalize lines for comparison (ignore whitespace differences)
+        var normalized1 = lines1.Select(NormalizeWhitespace).ToArray();
+        var normalized2 = lines2.Select(NormalizeWhitespace).ToArray();
+        
+        var diff = new List<DiffLine>();
+        
+        // Simple line-by-line diff using longest common subsequence approach
+        int i = 0, j = 0;
+        while (i < lines1.Length || j < lines2.Length)
+        {
+            if (i < lines1.Length && j < lines2.Length && normalized1[i] == normalized2[j])
+            {
+                // Lines match (ignoring whitespace)
+                diff.Add(new DiffLine { Type = "context", Marker = " ", Content = lines1[i] });
+                i++;
+                j++;
+            }
+            else if (j < lines2.Length && (i >= lines1.Length || !normalized1.Skip(i).Contains(normalized2[j])))
+            {
+                // Line added in text2
+                diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
+                j++;
+            }
+            else if (i < lines1.Length && (j >= lines2.Length || !normalized2.Skip(j).Contains(normalized1[i])))
+            {
+                // Line removed from text1
+                diff.Add(new DiffLine { Type = "removed", Marker = "-", Content = lines1[i] });
+                i++;
+            }
+            else
+            {
+                // Try to find matching line ahead
+                bool found = false;
+                for (int k = j + 1; k < lines2.Length && k < j + 10; k++)
+                {
+                    if (i < lines1.Length && normalized1[i] == normalized2[k])
+                    {
+                        // Found match ahead, mark intermediate lines as added
+                        while (j < k)
+                        {
+                            diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
+                            j++;
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (!found)
+                {
+                    // No match found, mark as removed
+                    if (i < lines1.Length)
+                    {
+                        diff.Add(new DiffLine { Type = "removed", Marker = "-", Content = lines1[i] });
+                        i++;
+                    }
+                    else if (j < lines2.Length)
+                    {
+                        diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
+                        j++;
+                    }
+                }
+            }
+        }
+        
+        return diff;
+    }
+
+    private string NormalizeWhitespace(string line)
+    {
+        // Normalize a single line: trim and collapse multiple whitespace characters to single spaces
+        return System.Text.RegularExpressions.Regex.Replace(line.Trim(), @"\s+", " ");
+    }
+
+    private string NormalizeTextForComparison(string text)
+    {
+        // Normalize entire text: collapse multiple whitespace to single spaces, normalize line breaks
+        var normalized = System.Text.RegularExpressions.Regex.Replace(text, @"\r\n|\r|\n", "\n"); // Normalize line breaks
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[ \t]+", " "); // Collapse horizontal whitespace
+        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\n{3,}", "\n\n"); // Collapse multiple newlines to double newline max
+        return normalized.Trim();
+    }
+
+    private class DiffLine
+    {
+        public string Type { get; set; } = string.Empty; // "added", "removed", "context"
+        public string Marker { get; set; } = string.Empty; // "+", "-", " "
+        public string Content { get; set; } = string.Empty;
+    }
+}
+
