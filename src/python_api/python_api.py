@@ -17,7 +17,7 @@ async def root():
     return {
         'message': 'PDF Reader API',
         'endpoints': {
-            '/read-pdf': 'POST - Extract text from uploaded PDF file',
+            '/py-mu-pdf': 'POST - Extract text from uploaded PDF file via PyMuPDF',
             '/health': 'GET - Health check',
             '/docs': 'GET - Interactive API documentation (Swagger UI)',
             '/redoc': 'GET - Alternative API documentation (ReDoc)'
@@ -26,7 +26,7 @@ async def root():
     }
 
 
-@app.post('/pymupdf/read-pdf')
+@app.post('/py-mu-pdf')
 async def read_pdf(file: UploadFile = File(...)):
     """
     Extracts text from an uploaded PDF file and returns it.

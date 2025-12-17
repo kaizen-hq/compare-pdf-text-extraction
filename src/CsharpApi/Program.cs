@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
+using CsharpApi.Services;
 
 var builder = WebApplication.CreateSlimBuilder(args);
 
@@ -17,6 +18,44 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+app.MapPost("/pdf-pig", async (HttpRequest req, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        if (!req.HasFormContentType)
+            return Results.BadRequest(new { Success = false, Error = "Expected multipart/form-data with a file field." });
+
+        var form = await req.ReadFormAsync(cancellationToken);
+        var file = form.Files["file"] ?? form.Files.FirstOrDefault();
+        if (file == null)
+            return Results.BadRequest(new { Success = false, Error = "No file provided." });
+
+        await using var stream = file.OpenReadStream();
+        var service = new PdfPigPdfReaderService();
+        var text = await service.ExtractText(stream, file.FileName, cancellationToken);
+
+        var response = new
+        {
+            Success = true,
+            Text = text,
+            Pages = 0,
+            Filename = file.FileName,
+            Error = (string?)null
+        };
+
+        return Results.Ok(response);
+    }
+    catch (OperationCanceledException)
+    {
+        throw;
+    }
+    catch (Exception ex)
+    {
+        var errorResp = new { Success = false, Text = (string?)null, Pages = 0, Filename = (string?)null, Error = ex.Message };
+        return Results.BadRequest(errorResp);
+    }
+});
 
 Todo[] sampleTodos =
 [

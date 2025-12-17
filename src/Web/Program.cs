@@ -1,4 +1,5 @@
 using Web.Components;
+using Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,20 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddHttpClient<PyMuPdfService>(client =>
+{
+    // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+    client.BaseAddress = new("https+http://python-api");
+    client.Timeout = TimeSpan.FromMinutes(1);
+});
+
+builder.Services.AddHttpClient<PdfPigService>(client =>
+{
+    client.BaseAddress = new("https+http://csharp-api");
+    client.Timeout = TimeSpan.FromMinutes(1);
+});
 
 var app = builder.Build();
 
