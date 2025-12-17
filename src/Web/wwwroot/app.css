@@ -33,6 +33,11 @@ body {
     padding: 0;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
+}
+
+body > main {
+    flex: 1;
 }
 
 .container {
@@ -471,13 +476,3 @@ h1:focus {
     text-align: start;
 }
 
-/* Page layout */
-.page {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-main {
-    flex: 1;
-}
