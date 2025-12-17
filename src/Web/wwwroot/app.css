@@ -139,8 +139,7 @@ body>header.header .logo {
 }
 
 .people-section {
-    margin: 1rem auto;
-    padding: 2rem;
+    margin: -3rem auto 3rem;
     border-radius: 12px;
     border: 2px solid #e5e7eb;
     background-color: white;
