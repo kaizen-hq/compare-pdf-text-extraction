@@ -1,3 +1,7 @@
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+
 namespace CsharpApi.Services;
 
 public interface IPdfReaderService
