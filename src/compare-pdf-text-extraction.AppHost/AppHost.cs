@@ -9,12 +9,14 @@ var pythonApi = builder
     .AddUvicornApp("python-api", "../python_api", "python_api:app")
     .WithUv()
     //.WithEndpoint("http", e => e.UriScheme  = builder.ExecutionContext.IsPublishMode ? "https" : "http")
-    .WithExternalHttpEndpoints()
+    //.WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health");
 
-var csharpApi = builder.AddProject<Projects.CsharpApi>("csharp-api");
+var csharpApi = builder.AddProject<Projects.CsharpApi>("csharp-api")
+    .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.Web>("web")
+    .WithEndpoint("http", e => e.Port = 59436)
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(pythonApi)
