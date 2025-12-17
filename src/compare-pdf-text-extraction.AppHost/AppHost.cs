@@ -1,6 +1,10 @@
 var builder = DistributedApplication.CreateBuilder(args);
 const string appName = "compare-pdf-text-extraction";
 
+builder.AddDockerComposeEnvironment("env")
+    .WithDashboard(db => db.WithHostPort(8085))
+    .WithSshDeploySupport();
+
 var pythonApi = builder
     .AddUvicornApp("python-api", "../python_api", "python_api:app")
     .WithUv()

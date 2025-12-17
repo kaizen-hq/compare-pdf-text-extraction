@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Docker.SshDeploy" Version="0.1.0-ci.131" />
     <PackageReference Include="Aspire.Hosting.Python" Version="13.0.2" />
   </ItemGroup>
 
