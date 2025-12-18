@@ -90,8 +90,8 @@
                         <div class="row text-center">
                             <div class="col-md-4">
                                 <strong>PyMuPdf</strong><br/>
-                                <span class="badge bg-info">@_httpClientTextLength chars</span>
-                                <span class="badge bg-secondary">@FormatTime(_httpClientElapsed)</span>
+                                <span class="badge bg-info">@_pyMuPdfTextLength chars</span>
+                                <span class="badge bg-secondary">@FormatTime(_pyMuPdfElapsed)</span>
                             </div>
                             <div class="col-md-4">
                                 <strong>PdfPig</strong><br/>
@@ -101,11 +101,17 @@
                             <div class="col-md-4">
                                 <strong>Result</strong><br/>
                                 <span class="badge @(_textsMatch ? "bg-success" : "bg-warning")">
-                                    @(_textsMatch ? "Identical" : "Different")
+                                    @(_textsMatch ? "Content Match" : "Content Differs")
                                 </span>
+                                @if (_pyMuPdfWhitespaceCount != _pdfPigWhitespaceCount)
+                                {
+                                    <span class="badge bg-info" title="Whitespace character count differs">
+                                        WS ≠
+                                    </span>
+                                }
                                 @{
-                                    var faster = _httpClientElapsed < _pdfPigElapsed ? "PyMuPdf" : "PdfPig";
-                                    var diff = Math.Abs((_httpClientElapsed - _pdfPigElapsed).TotalMilliseconds);
+                                    var faster = _pyMuPdfElapsed < _pdfPigElapsed ? "PyMuPdf" : "PdfPig";
+                                    var diff = Math.Abs((_pyMuPdfElapsed - _pdfPigElapsed).TotalMilliseconds);
                                 }
                                 <span class="badge bg-dark">@faster +@diff.ToString("F0")ms</span>
                             </div>
@@ -120,9 +126,9 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">PyMuPdf</h5>
-                        @if (!string.IsNullOrEmpty(_httpClientText))
+                        @if (!string.IsNullOrEmpty(_pyMuPdfText))
                         {
-                            <button class="btn-copy" @onclick="() => CopyToClipboard(_httpClientText, 1)" title="Copy to clipboard">
+                            <button class="btn-copy" @onclick="() => CopyToClipboard(_pyMuPdfText, 1)" title="Copy to clipboard">
                                 @if (_copiedIndex == 1)
                                 {
                                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -141,13 +147,13 @@
                     </div>
                     <div class="card-body">
                         <div class="text-output">
-                            @if (string.IsNullOrEmpty(_httpClientText))
+                            @if (string.IsNullOrEmpty(_pyMuPdfText))
                             {
                                 <em class="text-muted">No text extracted</em>
                             }
                             else
                             {
-                                <pre>@_httpClientText</pre>
+                                <pre>@_pyMuPdfText</pre>
                             }
                         </div>
                     </div>
@@ -257,11 +263,13 @@
     private string _errorMessage = string.Empty;
     private bool _hasResults;
 
-    private string _httpClientText = string.Empty;
+    private string _pyMuPdfText = string.Empty;
     private string _pdfPigText = string.Empty;
-    private int _httpClientTextLength;
+    private int _pyMuPdfTextLength;
     private int _pdfPigTextLength;
-    private TimeSpan _httpClientElapsed;
+    private int _pyMuPdfWhitespaceCount;
+    private int _pdfPigWhitespaceCount;
+    private TimeSpan _pyMuPdfElapsed;
     private TimeSpan _pdfPigElapsed;
     private bool _textsMatch;
 
@@ -291,10 +299,12 @@
         _uploadedFileName = e.File.Name;
         _hasResults = false;
         _errorMessage = string.Empty;
-        _httpClientText = string.Empty;
+        _pyMuPdfText = string.Empty;
         _pdfPigText = string.Empty;
-        _httpClientElapsed = TimeSpan.Zero;
+        _pyMuPdfElapsed = TimeSpan.Zero;
         _pdfPigElapsed = TimeSpan.Zero;
+        _pyMuPdfWhitespaceCount = 0;
+        _pdfPigWhitespaceCount = 0;
         StateHasChanged();
     }
 
@@ -309,10 +319,12 @@
         _isProcessing = true;
         _errorMessage = string.Empty;
         _hasResults = false;
-        _httpClientText = string.Empty;
+        _pyMuPdfText = string.Empty;
         _pdfPigText = string.Empty;
-        _httpClientElapsed = TimeSpan.Zero;
+        _pyMuPdfElapsed = TimeSpan.Zero;
         _pdfPigElapsed = TimeSpan.Zero;
+        _pyMuPdfWhitespaceCount = 0;
+        _pdfPigWhitespaceCount = 0;
 
         try
         {
@@ -339,18 +351,20 @@
             var httpClientResult = await httpClientTask;
             var pdfPigResult = await pdfPigTask;
 
-            _httpClientText = httpClientResult.Text;
+            _pyMuPdfText = httpClientResult.Text;
             _pdfPigText = pdfPigResult.Text;
-            _httpClientElapsed = httpClientResult.ElapsedTime;
+            _pyMuPdfElapsed = httpClientResult.ElapsedTime;
             _pdfPigElapsed = pdfPigResult.ElapsedTime;
 
-            _httpClientTextLength = _httpClientText.Length;
-            _pdfPigTextLength = _pdfPigText.Length;
+            _pyMuPdfTextLength = _pyMuPdfText.Count(c => !char.IsWhiteSpace(c));
+            _pdfPigTextLength = _pdfPigText.Count(c => !char.IsWhiteSpace(c));
+            _pyMuPdfWhitespaceCount = _pyMuPdfText.Count(char.IsWhiteSpace);
+            _pdfPigWhitespaceCount = _pdfPigText.Count(char.IsWhiteSpace);
 
-            // Compare texts ignoring whitespace differences
-            var normalized1 = NormalizeTextForComparison(_httpClientText);
-            var normalized2 = NormalizeTextForComparison(_pdfPigText);
-            _textsMatch = normalized1 == normalized2;
+            // Compare texts ignoring all whitespace
+            var stripped1 = new string(_pyMuPdfText.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            var stripped2 = new string(_pdfPigText.Where(c => !char.IsWhiteSpace(c)).ToArray());
+            _textsMatch = stripped1 == stripped2;
 
             _hasResults = true;
         }
@@ -364,15 +378,6 @@
             _isProcessing = false;
             StateHasChanged();
         }
-    }
-
-    private static string NormalizeTextForComparison(string text)
-    {
-        // Normalize entire text: collapse multiple whitespace to single spaces, normalize line breaks
-        var normalized = System.Text.RegularExpressions.Regex.Replace(text, @"\r\n|\r|\n", "\n"); // Normalize line breaks
-        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[ \t]+", " "); // Collapse horizontal whitespace
-        normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\n{3,}", "\n\n"); // Collapse multiple newlines to double newline max
-        return normalized.Trim();
     }
 }
 
