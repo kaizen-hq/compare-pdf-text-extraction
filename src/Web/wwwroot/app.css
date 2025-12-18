@@ -110,7 +110,7 @@ body>header.header .logo {
 .people-hero {
     background: linear-gradient(135deg, #d94a2a 0%, #ff5722 100%);
     color: white;
-    padding: 150px 0 120px;
+    padding: 3rem 0 4rem;
     text-align: center;
     position: relative;
     overflow: visible;
