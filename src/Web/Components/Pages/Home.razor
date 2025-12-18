@@ -87,20 +87,27 @@
                         <h5 class="mb-0">Comparison Summary</h5>
                     </div>
                     <div class="card-body">
-                        <div class="row">
+                        <div class="row text-center">
                             <div class="col-md-4">
-                                <strong>PyMuPdf:</strong><br/>
-                                <span class="badge bg-info">@_httpClientTextLength characters</span>
+                                <strong>PyMuPdf</strong><br/>
+                                <span class="badge bg-info">@_httpClientTextLength chars</span>
+                                <span class="badge bg-secondary">@FormatTime(_httpClientElapsed)</span>
                             </div>
                             <div class="col-md-4">
-                                <strong>Pdf Pig:</strong><br/>
-                                <span class="badge bg-info">@_pdfPigTextLength characters</span>
+                                <strong>PdfPig</strong><br/>
+                                <span class="badge bg-info">@_pdfPigTextLength chars</span>
+                                <span class="badge bg-secondary">@FormatTime(_pdfPigElapsed)</span>
                             </div>
                             <div class="col-md-4">
-                                <strong>Difference:</strong><br/>
+                                <strong>Result</strong><br/>
                                 <span class="badge @(_textsMatch ? "bg-success" : "bg-warning")">
                                     @(_textsMatch ? "Identical" : "Different")
                                 </span>
+                                @{
+                                    var faster = _httpClientElapsed < _pdfPigElapsed ? "PyMuPdf" : "PdfPig";
+                                    var diff = Math.Abs((_httpClientElapsed - _pdfPigElapsed).TotalMilliseconds);
+                                }
+                                <span class="badge bg-dark">@faster +@diff.ToString("F0")ms</span>
                             </div>
                         </div>
                     </div>
@@ -184,30 +191,6 @@
                 </div>
             </div>
         </div>
-
-        @if (!_textsMatch)
-        {
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="mb-0">Text Diff</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="diff-output">
-                                @foreach (var line in _diffLines)
-                                {
-                                    <div class="diff-line @line.Type">
-                                        <span class="diff-marker">@line.Marker</span>
-                                        <span class="diff-content">@line.Content</span>
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        }
     }
 </div>
 
@@ -227,48 +210,6 @@
         /*white-space: pre-wrap;
         word-wrap: break-word;*/
         overflow: visible;
-    }
-
-    .diff-output {
-        max-height: 600px;
-        overflow-y: auto;
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.25rem;
-        font-family: 'Courier New', monospace;
-        font-size: 0.85rem;
-        line-height: 1.6;
-    }
-
-    .diff-line {
-        padding: 2px 0;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
-
-    .diff-line.added {
-        background-color: #d4edda;
-    }
-
-    .diff-line.removed {
-        background-color: #f8d7da;
-    }
-
-    .diff-line.context {
-        background-color: transparent;
-    }
-
-    .diff-marker {
-        display: inline-block;
-        width: 30px;
-        text-align: right;
-        margin-right: 10px;
-        color: #6c757d;
-        font-weight: bold;
-    }
-
-    .diff-content {
-        display: inline-block;
     }
 
     .card {
@@ -320,9 +261,10 @@
     private string _pdfPigText = string.Empty;
     private int _httpClientTextLength;
     private int _pdfPigTextLength;
+    private TimeSpan _httpClientElapsed;
+    private TimeSpan _pdfPigElapsed;
     private bool _textsMatch;
 
-    private List<DiffLine> _diffLines = new();
     private int _copiedIndex;
 
     private async Task CopyToClipboard(string text, int index)
@@ -336,6 +278,13 @@
         StateHasChanged();
     }
 
+    private static string FormatTime(TimeSpan elapsed)
+    {
+        if (elapsed.TotalSeconds >= 1)
+            return $"{elapsed.TotalSeconds:F2}s";
+        return $"{elapsed.TotalMilliseconds:F0}ms";
+    }
+
     private void HandleFileSelected(InputFileChangeEventArgs e)
     {
         _selectedFile = e.File;
@@ -344,7 +293,8 @@
         _errorMessage = string.Empty;
         _httpClientText = string.Empty;
         _pdfPigText = string.Empty;
-        _diffLines.Clear();
+        _httpClientElapsed = TimeSpan.Zero;
+        _pdfPigElapsed = TimeSpan.Zero;
         StateHasChanged();
     }
 
@@ -361,49 +311,46 @@
         _hasResults = false;
         _httpClientText = string.Empty;
         _pdfPigText = string.Empty;
-        _diffLines.Clear();
+        _httpClientElapsed = TimeSpan.Zero;
+        _pdfPigElapsed = TimeSpan.Zero;
 
         try
         {
             // Read the file stream
             await using var fileStream = _selectedFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024); // 100MB max
-            
+
             // Create memory streams for both services (they may consume the stream)
             var httpClientStream = new MemoryStream();
             var pdfPigStream = new MemoryStream();
-            
+
             await fileStream.CopyToAsync(httpClientStream);
             httpClientStream.Position = 0;
             await httpClientStream.CopyToAsync(pdfPigStream);
 
-            Console.WriteLine($"position: {httpClientStream.Position}");
-            
             httpClientStream.Position = 0;
             pdfPigStream.Position = 0;
 
-            Console.WriteLine($"position: {httpClientStream.Position}");
             // Extract text from both services in parallel
             var httpClientTask = PdfReaderService.ExtractText(httpClientStream, _selectedFile.Name);
             var pdfPigTask = PdfPigService.ExtractText(pdfPigStream, _selectedFile.Name);
 
             await Task.WhenAll(httpClientTask, pdfPigTask);
 
-            _httpClientText = await httpClientTask;
-            _pdfPigText = await pdfPigTask;
+            var httpClientResult = await httpClientTask;
+            var pdfPigResult = await pdfPigTask;
+
+            _httpClientText = httpClientResult.Text;
+            _pdfPigText = pdfPigResult.Text;
+            _httpClientElapsed = httpClientResult.ElapsedTime;
+            _pdfPigElapsed = pdfPigResult.ElapsedTime;
 
             _httpClientTextLength = _httpClientText.Length;
             _pdfPigTextLength = _pdfPigText.Length;
-            
+
             // Compare texts ignoring whitespace differences
             var normalized1 = NormalizeTextForComparison(_httpClientText);
             var normalized2 = NormalizeTextForComparison(_pdfPigText);
             _textsMatch = normalized1 == normalized2;
-
-            // Generate diff if texts don't match (ignoring whitespace)
-            if (!_textsMatch)
-            {
-                _diffLines = GenerateDiff(_httpClientText, _pdfPigText);
-            }
 
             _hasResults = true;
         }
@@ -419,99 +366,13 @@
         }
     }
 
-    private List<DiffLine> GenerateDiff(string text1, string text2)
-    {
-        var lines1 = text1.Split('\n');
-        var lines2 = text2.Split('\n');
-        
-        // Normalize lines for comparison (ignore whitespace differences)
-        var normalized1 = lines1.Select(NormalizeWhitespace).ToArray();
-        var normalized2 = lines2.Select(NormalizeWhitespace).ToArray();
-        
-        var diff = new List<DiffLine>();
-        
-        // Simple line-by-line diff using longest common subsequence approach
-        int i = 0, j = 0;
-        while (i < lines1.Length || j < lines2.Length)
-        {
-            if (i < lines1.Length && j < lines2.Length && normalized1[i] == normalized2[j])
-            {
-                // Lines match (ignoring whitespace)
-                diff.Add(new DiffLine { Type = "context", Marker = " ", Content = lines1[i] });
-                i++;
-                j++;
-            }
-            else if (j < lines2.Length && (i >= lines1.Length || !normalized1.Skip(i).Contains(normalized2[j])))
-            {
-                // Line added in text2
-                diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
-                j++;
-            }
-            else if (i < lines1.Length && (j >= lines2.Length || !normalized2.Skip(j).Contains(normalized1[i])))
-            {
-                // Line removed from text1
-                diff.Add(new DiffLine { Type = "removed", Marker = "-", Content = lines1[i] });
-                i++;
-            }
-            else
-            {
-                // Try to find matching line ahead
-                bool found = false;
-                for (int k = j + 1; k < lines2.Length && k < j + 10; k++)
-                {
-                    if (i < lines1.Length && normalized1[i] == normalized2[k])
-                    {
-                        // Found match ahead, mark intermediate lines as added
-                        while (j < k)
-                        {
-                            diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
-                            j++;
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-                
-                if (!found)
-                {
-                    // No match found, mark as removed
-                    if (i < lines1.Length)
-                    {
-                        diff.Add(new DiffLine { Type = "removed", Marker = "-", Content = lines1[i] });
-                        i++;
-                    }
-                    else if (j < lines2.Length)
-                    {
-                        diff.Add(new DiffLine { Type = "added", Marker = "+", Content = lines2[j] });
-                        j++;
-                    }
-                }
-            }
-        }
-        
-        return diff;
-    }
-
-    private string NormalizeWhitespace(string line)
-    {
-        // Normalize a single line: trim and collapse multiple whitespace characters to single spaces
-        return System.Text.RegularExpressions.Regex.Replace(line.Trim(), @"\s+", " ");
-    }
-
-    private string NormalizeTextForComparison(string text)
+    private static string NormalizeTextForComparison(string text)
     {
         // Normalize entire text: collapse multiple whitespace to single spaces, normalize line breaks
         var normalized = System.Text.RegularExpressions.Regex.Replace(text, @"\r\n|\r|\n", "\n"); // Normalize line breaks
         normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"[ \t]+", " "); // Collapse horizontal whitespace
         normalized = System.Text.RegularExpressions.Regex.Replace(normalized, @"\n{3,}", "\n\n"); // Collapse multiple newlines to double newline max
         return normalized.Trim();
-    }
-
-    private class DiffLine
-    {
-        public string Type { get; set; } = string.Empty; // "added", "removed", "context"
-        public string Marker { get; set; } = string.Empty; // "+", "-", " "
-        public string Content { get; set; } = string.Empty;
     }
 }
 

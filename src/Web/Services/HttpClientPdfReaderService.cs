@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -11,10 +12,14 @@ namespace Web.Services;
 public class PyMuPdfService(HttpClient httpClient) : HttpClientPdfReaderService(httpClient, "py-mu-pdf");
 public class PdfPigService(HttpClient httpClient) : HttpClientPdfReaderService(httpClient, "pdf-pig");
 
+public record ExtractionResult(string Text, TimeSpan ElapsedTime);
+
 public abstract class HttpClientPdfReaderService(HttpClient httpClient, string path)
 {
-    public async Task<string> ExtractText(Stream fileStream, string fileName, CancellationToken cancellationToken = default)
+    public async Task<ExtractionResult> ExtractText(Stream fileStream, string fileName, CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
             // Create multipart form data content
@@ -25,6 +30,8 @@ public abstract class HttpClientPdfReaderService(HttpClient httpClient, string p
 
             // POST to PDF reader service
             var response = await httpClient.PostAsync($"/{path}", content, cancellationToken);
+
+            stopwatch.Stop();
 
             // Check if request was successful
             if (!response.IsSuccessStatusCode)
@@ -57,7 +64,7 @@ public abstract class HttpClientPdfReaderService(HttpClient httpClient, string p
                 throw new InvalidOperationException("PDF extraction returned empty text");
             }
 
-            return result.Text;
+            return new ExtractionResult(result.Text, stopwatch.Elapsed);
         }
         catch (HttpRequestException)
         {
