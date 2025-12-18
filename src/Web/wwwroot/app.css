@@ -631,3 +631,7 @@ h1:focus {
     }
 }
 
+#dotnet-compile-error:empty {
+    visibility: hidden;
+    display: none;
+}
