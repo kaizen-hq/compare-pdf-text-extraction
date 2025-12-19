@@ -10,6 +10,7 @@ builder.AddDockerComposeEnvironment("env")
 var pythonApi = builder
     .AddUvicornApp("python-api", "../python_api", "python_api:app")
     .WithUv()
+    .WithContainerBuildOptions(context => context.TargetPlatform = ContainerTargetPlatform.LinuxArm64)
     //.WithEndpoint("http", e => e.UriScheme  = builder.ExecutionContext.IsPublishMode ? "https" : "http")
     //.WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health");
