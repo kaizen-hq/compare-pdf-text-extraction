@@ -35,8 +35,19 @@
 
 <body>
     <Routes />
-    <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/form-spinner.js"]" data-spinner="ring"></script>
+    <script>
+        function copyTextOf(btn, id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            navigator.clipboard.writeText(el.textContent);
+            const original = btn.dataset.label || btn.textContent;
+            btn.dataset.label = original;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = original; }, 2000);
+        }
+    </script>
 </body>
 
 </html>

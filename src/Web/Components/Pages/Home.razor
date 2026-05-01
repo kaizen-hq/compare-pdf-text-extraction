@@ -1,10 +1,6 @@
-﻿@page "/"
-@using System.IO
+@page "/"
 @using Web.Services
-@rendermode InteractiveServer
-@inject PyMuPdfService PdfReaderService
-@inject PdfPigService PdfPigService
-@inject IJSRuntime JsRuntime
+@inject IMemoryCache Cache
 
 <PageTitle>PDF Text Extraction Comparison - Memoranda</PageTitle>
 
@@ -49,54 +45,35 @@
                     <h5 class="mb-0">Upload PDF</h5>
                 </div>
                 <div class="card-body">
-                    <InputFile OnChange="HandleFileSelected" class="form-control mb-3" accept=".pdf" />
-                    @if (!string.IsNullOrEmpty(_uploadedFileName))
-                    {
-                        <div class="alert alert-success">
-                            <i class="bi bi-check-circle"></i> File selected: @_uploadedFileName
-                        </div>
-                    }
-                    <button class="btn btn-primary" @onclick="CompareExtraction" disabled="@(_isProcessing || _selectedFile == null)">
-                        @if (_isProcessing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                            <text>Processing...</text>
-                        }
-                        else
-                        {
-                            <text>Compare Extraction</text>
-                        }
-                    </button>
-                    @if (!string.IsNullOrEmpty(_errorMessage))
-                    {
-                        <div class="alert alert-danger mt-3">
-                            <i class="bi bi-exclamation-triangle"></i> @_errorMessage
-                        </div>
-                    }
+                    <form method="post" action="/api/compare" enctype="multipart/form-data" data-enhance data-spinner-clock>
+                        <AntiforgeryToken />
+                        <input type="file" name="pdf" accept=".pdf" required class="form-control mb-3" />
+                        <button type="submit" class="btn btn-primary">Compare Extraction</button>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 
-    @if (_hasResults)
+    @if (_result is not null)
     {
         <div class="row mb-3">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0">Comparison Summary</h5>
+                        <h5 class="mb-0">Comparison Summary — @_result.FileName</h5>
                     </div>
                     <div class="card-body">
                         <div class="row text-center">
                             <div class="col-md-4">
                                 <strong>PyMuPdf</strong><br/>
                                 <span class="badge bg-info">@_pyMuPdfTextLength chars</span>
-                                <span class="badge bg-secondary">@FormatTime(_pyMuPdfElapsed)</span>
+                                <span class="badge bg-secondary">@FormatTime(_result.PyMuPdf.ElapsedTime)</span>
                             </div>
                             <div class="col-md-4">
                                 <strong>PdfPig</strong><br/>
                                 <span class="badge bg-info">@_pdfPigTextLength chars</span>
-                                <span class="badge bg-secondary">@FormatTime(_pdfPigElapsed)</span>
+                                <span class="badge bg-secondary">@FormatTime(_result.PdfPig.ElapsedTime)</span>
                             </div>
                             <div class="col-md-4">
                                 <strong>Result</strong><br/>
@@ -110,8 +87,8 @@
                                     </span>
                                 }
                                 @{
-                                    var faster = _pyMuPdfElapsed < _pdfPigElapsed ? "PyMuPdf" : "PdfPig";
-                                    var diff = Math.Abs((_pyMuPdfElapsed - _pdfPigElapsed).TotalMilliseconds);
+                                    var faster = _result.PyMuPdf.ElapsedTime < _result.PdfPig.ElapsedTime ? "PyMuPdf" : "PdfPig";
+                                    var diff = Math.Abs((_result.PyMuPdf.ElapsedTime - _result.PdfPig.ElapsedTime).TotalMilliseconds);
                                 }
                                 <span class="badge bg-dark">@faster +@diff.ToString("F0")ms</span>
                             </div>
@@ -126,35 +103,11 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">PyMuPdf</h5>
-                        @if (!string.IsNullOrEmpty(_pyMuPdfText))
-                        {
-                            <button class="btn-copy" @onclick="() => CopyToClipboard(_pyMuPdfText, 1)" title="Copy to clipboard">
-                                @if (_copiedIndex == 1)
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                }
-                            </button>
-                        }
+                        <button type="button" class="btn-copy" onclick="copyTextOf(this, 'py-text')" title="Copy to clipboard">Copy</button>
                     </div>
                     <div class="card-body">
                         <div class="text-output">
-                            @if (string.IsNullOrEmpty(_pyMuPdfText))
-                            {
-                                <em class="text-muted">No text extracted</em>
-                            }
-                            else
-                            {
-                                <pre>@_pyMuPdfText</pre>
-                            }
+                            <pre id="py-text">@_result.PyMuPdf.Text</pre>
                         </div>
                     </div>
                 </div>
@@ -163,39 +116,21 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Pdf Pig</h5>
-                        @if (!string.IsNullOrEmpty(_pdfPigText))
-                        {
-                            <button class="btn-copy" @onclick="() => CopyToClipboard(_pdfPigText, 2)" title="Copy to clipboard">
-                                @if (_copiedIndex == 2)
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                    </svg>
-                                }
-                            </button>
-                        }
+                        <button type="button" class="btn-copy" onclick="copyTextOf(this, 'pig-text')" title="Copy to clipboard">Copy</button>
                     </div>
                     <div class="card-body">
                         <div class="text-output">
-                            @if (string.IsNullOrEmpty(_pdfPigText))
-                            {
-                                <em class="text-muted">No text extracted</em>
-                            }
-                            else
-                            {
-                                <pre>@_pdfPigText</pre>
-                            }
+                            <pre id="pig-text">@_result.PdfPig.Text</pre>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
+    }
+    else if (Id is not null)
+    {
+        <div class="alert alert-warning mt-3">
+            Result expired or not found. Please upload again.
         </div>
     }
 </div>
@@ -213,8 +148,6 @@
 
     .text-output pre {
         margin: 0;
-        /*white-space: pre-wrap;
-        word-wrap: break-word;*/
         overflow: visible;
         font-family: ui-monospace;
         font-size: 1rem;
@@ -232,15 +165,13 @@
     }
 
     .btn-copy {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0.4rem;
-        border: none;
-        background: none;
-        color: var(--kaizen-gray);
+        padding: 0.25rem 0.6rem;
+        border: 1px solid var(--kaizen-gray, #ccc);
+        background: transparent;
+        color: var(--kaizen-gray, #555);
         border-radius: 6px;
         cursor: pointer;
+        font-size: 0.85rem;
         transition: all 0.2s ease;
     }
 
@@ -248,44 +179,37 @@
         background-color: rgba(0, 0, 0, 0.08);
         color: var(--kaizen-orange);
     }
-
-    .btn-copy svg {
-        transition: transform 0.2s ease;
-    }
-
-    .btn-copy:active svg {
-        transform: scale(0.9);
-    }
 </style>
 
 @code {
-    private IBrowserFile? _selectedFile;
-    private string _uploadedFileName = string.Empty;
-    private bool _isProcessing;
-    private string _errorMessage = string.Empty;
-    private bool _hasResults;
+    [SupplyParameterFromQuery] public string? Id { get; set; }
 
-    private string _pyMuPdfText = string.Empty;
-    private string _pdfPigText = string.Empty;
+    private CompareResult? _result;
     private int _pyMuPdfTextLength;
     private int _pdfPigTextLength;
     private int _pyMuPdfWhitespaceCount;
     private int _pdfPigWhitespaceCount;
-    private TimeSpan _pyMuPdfElapsed;
-    private TimeSpan _pdfPigElapsed;
     private bool _textsMatch;
 
-    private int _copiedIndex;
-
-    private async Task CopyToClipboard(string text, int index)
+    protected override void OnParametersSet()
     {
-        await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
-        _copiedIndex = index;
-        StateHasChanged();
+        _result = null;
+        if (string.IsNullOrEmpty(Id)) return;
+        if (!Cache.TryGetValue(Id, out CompareResult? r) || r is null) return;
 
-        await Task.Delay(2000);
-        _copiedIndex = 0;
-        StateHasChanged();
+        _result = r;
+
+        var py = r.PyMuPdf.Text;
+        var pig = r.PdfPig.Text;
+
+        _pyMuPdfTextLength = py.Count(c => !char.IsWhiteSpace(c));
+        _pdfPigTextLength = pig.Count(c => !char.IsWhiteSpace(c));
+        _pyMuPdfWhitespaceCount = py.Count(char.IsWhiteSpace);
+        _pdfPigWhitespaceCount = pig.Count(char.IsWhiteSpace);
+
+        var strippedPy = new string(py.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        var strippedPig = new string(pig.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        _textsMatch = strippedPy == strippedPig;
     }
 
     private static string FormatTime(TimeSpan elapsed)
@@ -294,92 +218,4 @@
             return $"{elapsed.TotalSeconds:F2}s";
         return $"{elapsed.TotalMilliseconds:F0}ms";
     }
-
-    private void HandleFileSelected(InputFileChangeEventArgs e)
-    {
-        _selectedFile = e.File;
-        _uploadedFileName = e.File.Name;
-        _hasResults = false;
-        _errorMessage = string.Empty;
-        _pyMuPdfText = string.Empty;
-        _pdfPigText = string.Empty;
-        _pyMuPdfElapsed = TimeSpan.Zero;
-        _pdfPigElapsed = TimeSpan.Zero;
-        _pyMuPdfWhitespaceCount = 0;
-        _pdfPigWhitespaceCount = 0;
-        StateHasChanged();
-    }
-
-    private async Task CompareExtraction()
-    {
-        if (_selectedFile == null)
-        {
-            _errorMessage = "Please select a file first";
-            return;
-        }
-
-        _isProcessing = true;
-        _errorMessage = string.Empty;
-        _hasResults = false;
-        _pyMuPdfText = string.Empty;
-        _pdfPigText = string.Empty;
-        _pyMuPdfElapsed = TimeSpan.Zero;
-        _pdfPigElapsed = TimeSpan.Zero;
-        _pyMuPdfWhitespaceCount = 0;
-        _pdfPigWhitespaceCount = 0;
-
-        try
-        {
-            // Read the file stream
-            await using var fileStream = _selectedFile.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024); // 100MB max
-
-            // Create memory streams for both services (they may consume the stream)
-            var httpClientStream = new MemoryStream();
-            var pdfPigStream = new MemoryStream();
-
-            await fileStream.CopyToAsync(httpClientStream);
-            httpClientStream.Position = 0;
-            await httpClientStream.CopyToAsync(pdfPigStream);
-
-            httpClientStream.Position = 0;
-            pdfPigStream.Position = 0;
-
-            // Extract text from both services in parallel
-            var httpClientTask = PdfReaderService.ExtractText(httpClientStream, _selectedFile.Name);
-            var pdfPigTask = PdfPigService.ExtractText(pdfPigStream, _selectedFile.Name);
-
-            await Task.WhenAll(httpClientTask, pdfPigTask);
-
-            var httpClientResult = await httpClientTask;
-            var pdfPigResult = await pdfPigTask;
-
-            _pyMuPdfText = httpClientResult.Text;
-            _pdfPigText = pdfPigResult.Text;
-            _pyMuPdfElapsed = httpClientResult.ElapsedTime;
-            _pdfPigElapsed = pdfPigResult.ElapsedTime;
-
-            _pyMuPdfTextLength = _pyMuPdfText.Count(c => !char.IsWhiteSpace(c));
-            _pdfPigTextLength = _pdfPigText.Count(c => !char.IsWhiteSpace(c));
-            _pyMuPdfWhitespaceCount = _pyMuPdfText.Count(char.IsWhiteSpace);
-            _pdfPigWhitespaceCount = _pdfPigText.Count(char.IsWhiteSpace);
-
-            // Compare texts ignoring all whitespace
-            var stripped1 = new string(_pyMuPdfText.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            var stripped2 = new string(_pdfPigText.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            _textsMatch = stripped1 == stripped2;
-
-            _hasResults = true;
-        }
-        catch (Exception ex)
-        {
-            _errorMessage = $"Error processing PDF: {ex}";
-            Console.WriteLine($"Error: {ex}");
-        }
-        finally
-        {
-            _isProcessing = false;
-            StateHasChanged();
-        }
-    }
 }
-
