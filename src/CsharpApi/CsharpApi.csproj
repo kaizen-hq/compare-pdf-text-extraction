@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
-    <PackageReference Include="PdfPig" Version="0.1.13-alpha-20251207-ee0cb" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+    <PackageReference Include="PdfPig" Version="0.1.15-alpha-20260427-046a5" />
   </ItemGroup>
 
   <ItemGroup>

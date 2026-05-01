@@ -3,7 +3,7 @@ using Aspire.Hosting.Publishing;
 var builder = DistributedApplication.CreateBuilder(args);
 const string appName = "compare-pdf-text-extraction";
 #pragma warning disable ASPIREPIPELINES003
-builder.AddDockerComposeEnvironment("env")
+builder.AddDockerComposeEnvironment(appName)
     .WithDashboard(db => db.WithHostPort(8085))
     .WithSshDeploySupport();
 
@@ -13,11 +13,13 @@ var pythonApi = builder
     .WithContainerBuildOptions(context => context.TargetPlatform = ContainerTargetPlatform.LinuxArm64)
     //.WithEndpoint("http", e => e.UriScheme  = builder.ExecutionContext.IsPublishMode ? "https" : "http")
     //.WithExternalHttpEndpoints()
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .PublishAsDockerComposeService((_, service) => service.Restart = "unless-stopped");
 
 var csharpApi = builder.AddProject<Projects.CsharpApi>("csharp-api")
     .WithContainerBuildOptions(context => context.TargetPlatform = ContainerTargetPlatform.LinuxArm64)
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .PublishAsDockerComposeService((_, service) => service.Restart = "unless-stopped");
 
 builder.AddProject<Projects.Web>("web")
     .WithContainerBuildOptions(context => context.TargetPlatform = ContainerTargetPlatform.LinuxArm64)
@@ -27,6 +29,7 @@ builder.AddProject<Projects.Web>("web")
     .WithReference(pythonApi)
     .WithReference(csharpApi)
     .WaitFor(pythonApi)
-    .WaitFor(csharpApi);
+    .WaitFor(csharpApi)
+    .PublishAsDockerComposeService((_, service) => service.Restart = "unless-stopped");
 
 builder.Build().Run();
