@@ -4,7 +4,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 const string appName = "compare-pdf-text-extraction";
 #pragma warning disable ASPIREPIPELINES003
 builder.AddDockerComposeEnvironment(appName)
-    .WithDashboard(db => db.WithHostPort(8085))
+    .WithDashboard(db => db.WithHostPort(8086))
     .WithSshDeploySupport();
 
 var pythonApi = builder
