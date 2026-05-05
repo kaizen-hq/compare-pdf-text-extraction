@@ -5,7 +5,9 @@ const string appName = "compare-pdf-text-extraction";
 #pragma warning disable ASPIREPIPELINES003
 builder.AddDockerComposeEnvironment(appName)
     .WithDashboard(db => db.WithHostPort(8086))
-    .WithSshDeploySupport();
+    .WithSshDeploySupport()
+    .WithImagePullPolicy(PullPolicy.Missing)
+    .WithPullRegistry("localhost:5001");
 
 var pythonApi = builder
     .AddUvicornApp("python-api", "../python_api", "python_api:app")
